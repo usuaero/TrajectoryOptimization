@@ -7,7 +7,7 @@ from standard_atmosphere import StandardAtmosphere
 class Airplane:
     """A class defining an airplane. Modeled using a linear drag model, stteady-state dynamics, etc."""
 
-    def __init__(self, info, propulsion_info) -> None:
+    def __init__(self, info, propulsion_info):
         
         # Store parameters
         self._b = info["wingspan"]
@@ -125,3 +125,164 @@ class Airplane:
         """
 
         return (self._CD0 + self._CD1*CL + self._CD2*CL*CL)*(1.0 + self._CM1*M**self._CM2)
+
+
+    def get_lift(self, W, gamma):
+        """Calculates the lift.
+        
+        Parameters
+        ----------
+        W : float
+            Weight.
+            
+        gamma : float
+            Climb angle.
+            
+        Returns
+        -------
+        float
+            Lift force in lbf.
+        """
+
+        return W*np.cos(gamma)
+
+
+    def get_CL(self, W, gamma, V, h):
+        """Calculates the lift coefficient.
+        
+        Parameters
+        ----------
+        W : float
+            Weight.
+            
+        gamma : float
+            Climb angle.
+
+        V : float
+            Velocity.
+
+        h : float
+            Altitude.
+            
+        Returns
+        -------
+        float
+            Lift coefficient
+        """
+
+        # Get density and lift
+        rho = self._std_atmos.rho(h)
+        L = self.get_lift(W, gamma)
+
+        # Calculate lift coefficient
+        return 2.0*L/(rho*V*V*self._Sw)
+
+
+    def get_drag(self, W, gamma, V, h):
+        """Calculates the drag force.
+        
+        Parameters
+        ----------
+        W : float
+            Weight.
+            
+        gamma : float
+            Climb angle.
+
+        V : float
+            Velocity.
+
+        h : float
+            Altitude.
+            
+        Returns
+        -------
+        float
+            Drag force in lbf.
+        """
+
+        # Get CL and rho
+        CL = self.get_CL(W, gamma, V, h)
+        rho = self._std_atmos.rho(h)
+
+        # Get CD
+        M = V/self._std_atmos.a(h)
+        CD = self.get_CD(CL, M)
+
+        return 0.5*rho*V*V*self._Sw*CD
+
+
+    def get_fuel_consumption_slf(self, V, W, h):
+        """Calculates the fuel consumption rate in steady-level flight.
+        
+        Parameters
+        ----------
+        V : float
+            Velocity.
+
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+        
+        Returns
+        -------
+        float
+            Fuel consumption rate.
+        """
+
+        # Get drag
+        D = self.get_drag(W, 0.0, V, h)
+
+        # Get thrust-specific fuel consumption
+        qT = self._engines.get_thrust_specific_fuel_consumption(h, V)
+
+        return qT*D
+
+
+    def get_min_fuel_consumption_airspeed_slf(self, W, h):
+        """Calculates the velocity which minimizes fuel consumption rate in steady-level flight.
+        
+        Parameters
+        ----------
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+        
+        Returns
+        -------
+        float
+            Minimum fuel consumption airspeed.
+        """
+
+        # Optimize
+        V_min = self.get_stall_speed(W, h)
+        V_max = 0.95*self._std_atmos.a(h) # No transonic here
+        result = sopt.minimize_scalar(self.get_fuel_consumption_slf, bounds=(V_min, V_max), method='bounded', args=(W, h))
+        return result.x
+
+
+    def get_stall_speed(self, W, h):
+        """Calculates the stall speed.
+        
+        Parameters
+        ----------
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+        
+        Returns
+        -------
+        float
+            Stall speed.
+        """
+
+        # Get density
+        rho = self._std_atmos.rho(h)
+
+        return np.sqrt(2.0*W/(rho*self._Sw*self._CL_max))

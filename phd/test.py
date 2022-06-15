@@ -1,3 +1,6 @@
+import enum
+import numpy as np
+import matplotlib.pyplot as plt
 from airplane import Airplane
 
 
@@ -30,7 +33,34 @@ if __name__=="__main__":
     # Initialize airplane
     AMG12 = Airplane(airplane_info, propulsion_info)
 
-    # Test state calculation
-    L, D, gamma, TA, V, M = AMG12.calc_state(0.5, 10000, 530000, 0.0)
-    print(V)
-    print(gamma)
+    ## Plot fuel consumption as a function of airspeed
+    #h = 10000
+    #W = 530000
+    #Vs = np.linspace(100, 1000, 200)
+    #FC = np.zeros_like(Vs)
+    #for i, V in enumerate(Vs):
+    #    FC[i] = AMG12.get_fuel_consumption_slf(V, W, h)
+
+    #plt.figure()
+    #plt.plot(Vs, FC)
+    #plt.xlabel('$V$ [ft/s]')
+    #plt.ylabel('Fuel Consumption')
+    #plt.show()
+
+    # Plot minimum fuel consumption airspeed as a function of altitude and weight
+    N_h = 10
+    N_W = 10
+    hs = np.linspace(0.0, 20000.0, N_h)
+    Ws = np.linspace(345000.0, 630000.0, N_W)
+    V_MFC = np.zeros((N_h, N_W))
+    for i, h in enumerate(hs):
+        for j, W in enumerate(Ws):
+            V_MFC[i,j] = AMG12.get_min_fuel_consumption_airspeed_slf(W, h)
+
+    plt.figure()
+    for i, h in enumerate(hs):
+        plt.plot(Ws, V_MFC[i,:], label=str(round(h)))
+    plt.xlabel('$W$ [lbf]')
+    plt.ylabel('$V_{MFC}$')
+    plt.legend(title='Altitude [ft]')
+    plt.show()

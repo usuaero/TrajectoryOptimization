@@ -4,7 +4,7 @@ from standard_atmosphere import StandardAtmosphere
 class Powerplant:
     """A class defining a jet powerplant."""
 
-    def __init__(self, propulsion_info) -> None:
+    def __init__(self, propulsion_info):
         
         # Store info
         self._Ne = propulsion_info["N_engines"]
@@ -41,7 +41,7 @@ class Powerplant:
         return self.get_max_thrust(h)*(1 + self._a1*V + self._a2*V*V)
 
 
-    def get_thrust_specific_fuel_consumption(self, h, M):
+    def get_thrust_specific_fuel_consumption(self, h, V):
         """Calculates the thrust-specific fuel consumption based on the altitude and velocity.
         
         Parameters
@@ -90,3 +90,26 @@ class Powerplant:
 
         # Calculate thrust
         return self._Ne*self._N1*self._T0*(Th/T0)**self._m
+
+
+    def get_fuel_consumption(self, V, h, K):
+        """Calculates the fuel consumption based on the altitude, velocity, and throttle setting.
+        
+        Parameters
+        ----------
+        V : float
+            Velocity in ft/s.
+        
+        h : float
+            Altitude in ft.
+
+        K : float
+            Throttle setting.
+            
+        Returns
+        -------
+        float
+            Fuel consumption.
+        """
+
+        return K*self.get_thrust_specific_fuel_consumption(h, V)*self.get_available_thrust(h, V)
