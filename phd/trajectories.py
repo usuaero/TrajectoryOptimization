@@ -102,8 +102,14 @@ class TrapezoidalTrajectory:
         # Allocate storage
         x = np.zeros(self._N_total_steps)
         h = np.zeros(self._N_total_steps)
+        V = np.zeros(self._N_total_steps)
+        TA = np.zeros(self._N_total_steps)
+        K = np.zeros(self._N_total_steps)
+        CL = np.zeros(self._N_total_steps)
+        fuel_burn = np.zeros(self._N_total_steps)
         gamma = np.zeros(self._N_total_steps)
         W = np.zeros(self._N_total_steps)
+        V_stall = np.zeros(self._N_total_steps)
 
         # Set final state (we'll be doing a backwards integration here)
         x[-1] = self._x[-1]
@@ -114,9 +120,6 @@ class TrapezoidalTrajectory:
         j_end = self._N_total_steps - 1
         j_start = j_end - self._N_steps[-1]
         for i in range(self._N_legs)[::-1]:
-
-            # Get dx
-            dx = -(self._x[i+1] - self._x[i])/self._N_steps[i]
 
             # Integrate
             y0 = np.array([self._gammas[i], h[j_end], W[j_end]])
@@ -132,4 +135,11 @@ class TrapezoidalTrajectory:
             j_end = j_start
             j_start = j_end - self._N_steps[i-1]
 
-        return x, gamma, h, W
+        # Calculate other parameters
+        for i in range(self._N_total_steps):
+            V[i] = self._airplane.get_max_range_airspeed(gamma[i], W[i], h[i])
+            CL[i] = self._airplane.get_CL(W[i], gamma[i], V[i], h[i])
+            K[i], TA[i], fuel_burn[i] = self._airplane.get_engine_performance(V[i], W[i], h[i], gamma[i])
+            V_stall[i] = self._airplane.get_stall_speed(W[i], h[i], gamma[i])
+
+        return x, gamma, h, W, V, CL, K, TA, fuel_burn, V_stall
