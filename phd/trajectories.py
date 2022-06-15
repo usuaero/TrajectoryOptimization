@@ -1,8 +1,9 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from airplane import Airplane
 
 
-def RK4(f, x0, t0, t1, dt):
+def RK4(f, x0, t0, t1, N_steps):
     """Integrates f(t,x) from t0 to t1 in steps of dt.
     
     Parameters
@@ -19,12 +20,13 @@ def RK4(f, x0, t0, t1, dt):
     t1 : float
         Final state for independent variable.
 
-    dt : float
-        Step size for independent variable.
+    N_steps : float
+        Number of steps to take in the independent variable.
     """
 
     # Initialize storage
-    t = np.arange(t0, t1, dt)
+    t = np.linspace(t0, t1, N_steps+1)
+    dt = t[1]-t[0]
     N = len(t)
     x = np.zeros((N,len(x0)))
     x[0,:] = x0
@@ -75,7 +77,7 @@ class TrapezoidalTrajectory:
             self._gammas[i] = np.arctan2(self._h[i+1]-self._h[i], self._x[i+1]-self._x[i])
 
         # Total number of integration steps
-        self._N_total_steps = np.sum(N_steps).item()
+        self._N_total_steps = np.sum(N_steps).item() + 1
 
 
     def calculate(self):
@@ -118,13 +120,13 @@ class TrapezoidalTrajectory:
 
             # Integrate
             y0 = np.array([self._gammas[i], h[j_end], W[j_end]])
-            x, y = RK4(self._airplane.state_equation_wrt_x, y0, self._x[i+1], self._x[i], dx)
+            xi, yi = RK4(self._airplane.state_equation_wrt_x, y0, self._x[i+1], self._x[i], self._N_steps[i])
 
             # Parse out state variables
-            x[j_start:j_end] = x
-            gamma[j_start:j_end] = y[:,0]
-            h[j_start:j_end] = y[:,1]
-            W[j_start:j_end] = y[:,2]
+            x[j_start:j_end+1] = xi[::-1]
+            gamma[j_start:j_end+1] = yi[::-1,0]
+            h[j_start:j_end+1] = yi[::-1,1]
+            W[j_start:j_end+1] = yi[::-1,2]
 
             # Set up for next iteration
             j_end = j_start

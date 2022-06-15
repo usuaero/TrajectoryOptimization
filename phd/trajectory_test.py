@@ -35,4 +35,20 @@ if __name__=="__main__":
     AMG12 = Airplane(airplane_info, propulsion_info)
     
     # Initialize trajectory
-    x = np.array()
+    x = np.array([0.0, 400000.0, 2500000.0, 3108188.29708082])
+    h = np.array([128.0, 10000.0, 10000.0, 4226.0])
+    N_steps = np.array([100, 100, 100])
+    trajectory = TrapezoidalTrajectory(AMG12, x, h, N_steps)
+
+    # Calculate
+    x, gamma, h, W = trajectory.calculate()
+
+    # Plot
+    fig, ax = plt.subplots(ncols=2)
+    ax[0].plot(x, h)
+    ax[1].plot(x, W)
+    ax[0].set_xlabel('$x$ [ft]')
+    ax[1].set_xlabel('$x$ [ft]')
+    ax[0].set_ylabel('$h$ [ft]')
+    ax[1].set_ylabel('$W$ [lbf]')
+    plt.show()

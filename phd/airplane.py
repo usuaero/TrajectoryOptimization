@@ -333,12 +333,12 @@ class Airplane:
         h_dot = V*np.sin(gamma)
 
         # Calculate mass rate
-        _,_,W_dot = self.get_engine_performance(V, W, h, gamma)
+        _,_,fuel_burn = self.get_engine_performance(V, W, h, gamma)
 
-        return x_dot, h_dot, W_dot
+        return x_dot, h_dot, -fuel_burn
 
 
-    def state_equation_wrt_x(self, y):
+    def state_equation_wrt_x(self, x, y):
         """Returns a state space derivative for the aircraft with x as the independent variable
         
         Parameters
