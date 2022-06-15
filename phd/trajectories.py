@@ -100,21 +100,12 @@ class TrapezoidalTrajectory:
         """
 
         # Allocate storage
-        x = np.zeros(self._N_total_steps)
-        h = np.zeros(self._N_total_steps)
-        V = np.zeros(self._N_total_steps)
-        TA = np.zeros(self._N_total_steps)
-        K = np.zeros(self._N_total_steps)
-        CL = np.zeros(self._N_total_steps)
-        fuel_burn = np.zeros(self._N_total_steps)
-        gamma = np.zeros(self._N_total_steps)
-        W = np.zeros(self._N_total_steps)
-        V_stall = np.zeros(self._N_total_steps)
+        data = TrajectoryParameters(self._N_total_steps)
 
         # Set final state (we'll be doing a backwards integration here)
-        x[-1] = self._x[-1]
-        h[-1] = self._h[-1]
-        W[-1] = self._airplane.get_min_weight()
+        data.x[-1] = self._x[-1]
+        data.h[-1] = self._h[-1]
+        data.W[-1] = self._airplane.get_min_weight()
 
         # Loop through legs of the trajectory
         j_end = self._N_total_steps - 1
@@ -122,14 +113,14 @@ class TrapezoidalTrajectory:
         for i in range(self._N_legs)[::-1]:
 
             # Integrate
-            y0 = np.array([self._gammas[i], h[j_end], W[j_end]])
+            y0 = np.array([self._gammas[i], data.h[j_end], data.W[j_end]])
             xi, yi = RK4(self._airplane.state_equation_wrt_x, y0, self._x[i+1], self._x[i], self._N_steps[i])
 
             # Parse out state variables
-            x[j_start:j_end+1] = xi[::-1]
-            gamma[j_start:j_end+1] = yi[::-1,0]
-            h[j_start:j_end+1] = yi[::-1,1]
-            W[j_start:j_end+1] = yi[::-1,2]
+            data.x[j_start:j_end+1] = xi[::-1]
+            data.gamma[j_start:j_end+1] = yi[::-1,0]
+            data.h[j_start:j_end+1] = yi[::-1,1]
+            data.W[j_start:j_end+1] = yi[::-1,2]
 
             # Set up for next iteration
             j_end = j_start
@@ -137,9 +128,36 @@ class TrapezoidalTrajectory:
 
         # Calculate other parameters
         for i in range(self._N_total_steps):
-            V[i] = self._airplane.get_max_range_airspeed(gamma[i], W[i], h[i])
-            CL[i] = self._airplane.get_CL(W[i], gamma[i], V[i], h[i])
-            K[i], TA[i], fuel_burn[i] = self._airplane.get_engine_performance(V[i], W[i], h[i], gamma[i])
-            V_stall[i] = self._airplane.get_stall_speed(W[i], h[i], gamma[i])
+            data.V[i] = self._airplane.get_max_range_airspeed(data.gamma[i], data.W[i], data.h[i])
+            data.CL[i] = self._airplane.get_CL(data.W[i], data.gamma[i], data.V[i], data.h[i])
+            data.K[i], data.TA[i], data.fuel_burn[i] = self._airplane.get_engine_performance(data.V[i], data.W[i], data.h[i], data.gamma[i])
+            data.V_stall[i] = self._airplane.get_stall_speed(data.W[i], data.h[i], data.gamma[i])
 
-        return x, gamma, h, W, V, CL, K, TA, fuel_burn, V_stall
+        return data
+
+
+class TrajectoryParameters:
+    """Container class for trajectory data.
+    
+    Parameters
+    ----------
+    N_steps : int
+        Total number of steps in the trajectory.
+    """
+
+    def __init__(self, N_steps):
+        
+        # Initialize
+        self.N_steps = N_steps
+
+        # Allocate storage
+        self.x = np.zeros(self.N_steps)
+        self.h = np.zeros(self.N_steps)
+        self.V = np.zeros(self.N_steps)
+        self.TA = np.zeros(self.N_steps)
+        self.K = np.zeros(self.N_steps)
+        self.CL = np.zeros(self.N_steps)
+        self.fuel_burn = np.zeros(self.N_steps)
+        self.gamma = np.zeros(self.N_steps)
+        self.W = np.zeros(self.N_steps)
+        self.V_stall = np.zeros(self.N_steps)
