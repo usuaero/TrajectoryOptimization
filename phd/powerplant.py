@@ -67,7 +67,7 @@ class Powerplant:
         M = V/a
 
         # Calculate consumption
-        return self._CT*(Th/T0)**0.5*M**self._q
+        return self._CT*(Th/T0)**0.5*M**self._q*32.2 # To convert from slugs to lbm
 
 
     def get_max_thrust(self, h):

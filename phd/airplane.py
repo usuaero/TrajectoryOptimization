@@ -14,6 +14,7 @@ class Airplane:
         self._Sw = info["wing_area"]
         self._We = info["empty_weight"]
         self._Wf_max = info["fuel_capacity"]
+        self._Wf_min = info["min_fuel"]
         self._CL_max = info["CL_max"]
         self._CD0 = info["CD0"]
         self._CD1 = info["CD1"]
@@ -22,88 +23,14 @@ class Airplane:
         self._CM2 = info["CM2"]
 
         # Store powerplant info
-        self._engines = Powerplant(propulsion_info)
+        self.engines = Powerplant(propulsion_info)
 
         # Initialize standard atmosphere model
         self._std_atmos = StandardAtmosphere("English")
 
 
-    def calc_state(self, K, h, W, x):
-        """Calculates the state of the aircraft based off the throttle setting, position, and weight.
-        
-        Parameters
-        ----------
-        K : float
-            Throttle setting between 0 and 1.
-
-        h : float
-            Altitude in ft.
-
-        W : float
-            Weight in lbf.
-
-        x : float
-            Position in ft.
-        """
-
-        # Get atmospheric parameters
-        rho = self._std_atmos.rho(h)
-        a = self._std_atmos.a(h)
-        
-        # Define function to find the root of
-        def f(state):
-
-            # Parse out state
-            L = state[0]
-            D = state[1]
-            gamma = state[2]
-            TA = state[3]
-            V = state[4]
-
-            # Initialize root
-            result = np.zeros(5)
-
-            # Calculate some preliminaries
-            M = V/a
-            nondim = 1.0/(0.5*rho*V*V*self._Sw)
-            CL = L*nondim
-            CD = D*nondim
-            PA = K*TA*V
-            PR = D*V
-            
-            # Lift equation
-            result[0] = L - W*np.sin(gamma)
-
-            # Drag equation
-            result[1] = D - TA*K + W*np.cos(gamma)
-
-            # Climb rate equation
-            result[2] = (PA-PR)/W - V*np.sin(gamma)
-
-            # Drag coefficient equation
-            result[3] = CD - self.get_CD(CL, M)
-
-            # Available thrust equation
-            result[4] = TA - self._engines.get_available_thrust(h, V)
-
-            return result
-
-        # Solve
-        V_guess = np.sqrt(2.0*W/(rho*self._Sw*0.5)) # Guess a lift coefficient of 0.5
-        state_guess = np.array([W, 0.0, 0.0, self._engines.get_max_thrust(h), V_guess])
-        state = sopt.fsolve(f, state_guess)
-
-        # Parse out state
-        L = state[0]
-        D = state[1]
-        gamma = state[2]
-        TA = state[3]
-        V = state[4]
-
-        # Get extras
-        M = V/a
-
-        return L, D, gamma, TA, V, M
+    def get_min_weight(self):
+        return self._We + self._Wf_min
 
 
     def get_CD(self, CL, M):
@@ -212,13 +139,16 @@ class Airplane:
         return 0.5*rho*V*V*self._Sw*CD
 
 
-    def get_fuel_consumption_slf(self, V, W, h):
-        """Calculates the fuel consumption rate in steady-level flight.
+    def get_fuel_consumption(self, V, gamma, W, h):
+        """Calculates the fuel consumption rate.
         
         Parameters
         ----------
         V : float
             Velocity.
+
+        gamma : float
+            Climb angle.
 
         W : float
             Weight.
@@ -229,23 +159,29 @@ class Airplane:
         Returns
         -------
         float
-            Fuel consumption rate.
+            Fuel consumption rate per s.
         """
 
         # Get drag
-        D = self.get_drag(W, 0.0, V, h)
+        D = self.get_drag(W, gamma, V, h)
+
+        # Calculate thrust
+        T = D + W*np.sin(gamma)
 
         # Get thrust-specific fuel consumption
-        qT = self._engines.get_thrust_specific_fuel_consumption(h, V)
+        qT = self.engines.get_thrust_specific_fuel_consumption(h, V)
 
-        return qT*D
+        return qT*T
 
 
-    def get_min_fuel_consumption_airspeed_slf(self, W, h):
-        """Calculates the velocity which minimizes fuel consumption rate in steady-level flight.
+    def get_min_fuel_consumption_airspeed(self, gamma, W, h):
+        """Calculates the velocity which minimizes fuel consumption rate per s.
         
         Parameters
         ----------
+        gamma : float
+            Climb angle.
+
         W : float
             Weight.
 
@@ -259,13 +195,44 @@ class Airplane:
         """
 
         # Optimize
-        V_min = self.get_stall_speed(W, h)
+        V_min = self.get_stall_speed(W, h, gamma)
         V_max = 0.95*self._std_atmos.a(h) # No transonic here
-        result = sopt.minimize_scalar(self.get_fuel_consumption_slf, bounds=(V_min, V_max), method='bounded', args=(W, h))
+        result = sopt.minimize_scalar(self.get_fuel_consumption, bounds=(V_min, V_max), method='bounded', args=(gamma, W, h))
         return result.x
 
 
-    def get_stall_speed(self, W, h):
+    def get_max_range_airspeed(self, gamma, W, h):
+        """Calculates the velocity which minimizes fuel consumption rate per distance travelled.
+        
+        Parameters
+        ----------
+        gamma : float
+            Climb angle.
+
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+        
+        Returns
+        -------
+        float
+            Maximum range airspeed.
+        """
+
+        # Declare objective function
+        def f(V):
+            return self.get_fuel_consumption(V, gamma, W, h)/V
+
+        # Optimize
+        V_min = self.get_stall_speed(W, h, gamma)
+        V_max = 0.95*self._std_atmos.a(h) # No transonic here
+        result = sopt.minimize_scalar(f, bounds=(V_min, V_max), method='bounded')
+        return result.x
+
+
+    def get_stall_speed(self, W, h, gamma):
         """Calculates the stall speed.
         
         Parameters
@@ -275,6 +242,9 @@ class Airplane:
 
         h : float
             Altitude.
+
+        gamma : float
+            Climb angle.
         
         Returns
         -------
@@ -285,4 +255,112 @@ class Airplane:
         # Get density
         rho = self._std_atmos.rho(h)
 
-        return np.sqrt(2.0*W/(rho*self._Sw*self._CL_max))
+        return np.sqrt(2.0*W*np.cos(gamma)/(rho*self._Sw*self._CL_max))
+
+
+    def get_engine_performance(self, V, W, h, gamma):
+        """Calculates the throttle setting, thrust available, and fuel consumption rate at the given state.
+        
+        Parameters
+        ----------
+        V : float
+            Velocity.
+
+        gamma : float
+            Climb angle.
+
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+        
+        Returns
+        -------
+        float
+            Throttle setting.
+
+        float
+            Thrust available in lbf.
+        """
+
+        # Calculate thrust available
+        TA = self.engines.get_available_thrust(h, V)
+
+        # Calculate drag
+        D = self.get_drag(W, gamma, V, h)
+
+        # Calculate throttle
+        K = (D + W*np.sin(gamma)) / TA
+
+        # Get thrust-specific fuel consumption
+        qT = self.engines.get_thrust_specific_fuel_consumption(h, V)
+
+        return K, TA, qT*K*TA
+
+
+    def get_dynamics(self, V, W, h, gamma):
+        """Calculates the dynamic equations for the aircraft.
+        
+        Parameters
+        ----------
+        V : float
+            Velocity.
+
+        gamma : float
+            Climb angle.
+
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+        
+        Returns
+        -------
+        float
+            Derivative of distance.
+
+        float
+            Climb rate.
+
+        float
+            Rate of weight loss.
+        """
+
+        # Calculate kinematics
+        x_dot = V*np.cos(gamma)
+        h_dot = V*np.sin(gamma)
+
+        # Calculate mass rate
+        _,_,W_dot = self.get_engine_performance(V, W, h, gamma)
+
+        return x_dot, h_dot, W_dot
+
+
+    def state_equation_wrt_x(self, y):
+        """Returns a state space derivative for the aircraft with x as the independent variable
+        
+        Parameters
+        ----------
+        y : ndarray
+            An array containing gamma, height, and weight.
+            
+        Returns
+        -------
+        ndarray
+            State space derivative of the state.
+        """
+
+        # Parse out state
+        gamma = y[0]
+        h = y[1]
+        W = y[2]
+
+        # Calculate best airspeed
+        V = self.get_max_range_airspeed(gamma, W, h)
+
+        # Get derivatives
+        x_dot, h_dot, W_dot = self.get_dynamics(V, W, h, gamma)
+
+        return np.array([0.0, h_dot/x_dot, W_dot/x_dot])

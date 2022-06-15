@@ -12,6 +12,7 @@ if __name__=="__main__":
         "wing_area" : 3600,
         "empty_weight" : 330000,
         "fuel_capacity" : 300000,
+        "min_fuel" : 45000,
         "CL_max" : 1.4,
         "CD0" : 0.0194,
         "CD1" : -0.0159,
@@ -52,15 +53,29 @@ if __name__=="__main__":
     N_W = 10
     hs = np.linspace(0.0, 20000.0, N_h)
     Ws = np.linspace(345000.0, 630000.0, N_W)
+    gamma = 0.0
     V_MFC = np.zeros((N_h, N_W))
+    V_MR = np.zeros((N_h, N_W))
     for i, h in enumerate(hs):
         for j, W in enumerate(Ws):
-            V_MFC[i,j] = AMG12.get_min_fuel_consumption_airspeed_slf(W, h)
+            V_MFC[i,j] = AMG12.get_min_fuel_consumption_airspeed(np.radians(gamma), W, h)
+            V_MR[i,j] = AMG12.get_max_range_airspeed(np.radians(gamma), W, h)
 
-    plt.figure()
+    fig, ax = plt.subplots(nrows=2,ncols=2)
     for i, h in enumerate(hs):
-        plt.plot(Ws, V_MFC[i,:], label=str(round(h)))
-    plt.xlabel('$W$ [lbf]')
-    plt.ylabel('$V_{MFC}$')
-    plt.legend(title='Altitude [ft]')
+        a = AMG12._std_atmos.a(h)
+        ax[0,0].plot(Ws, V_MFC[i,:], label=str(round(h)))
+        ax[1,0].plot(Ws, V_MR[i,:], label=str(round(h)))
+        ax[0,1].plot(Ws, V_MFC[i,:]/a, label=str(round(h)))
+        ax[1,1].plot(Ws, V_MR[i,:]/a, label=str(round(h)))
+
+    ax[0,1].set_xlabel('$W$ [lbf]')
+    ax[1,1].set_xlabel('$W$ [lbf]')
+
+    ax[0,0].set_ylabel('$V_{MFC}$')
+    ax[1,0].set_ylabel('$V_{MR}$')
+    ax[0,1].set_ylabel('$M_{MFC}$')
+    ax[1,1].set_ylabel('$M_{MR}$')
+
+    ax[0,0].legend(title='Altitude [ft]')
     plt.show()
