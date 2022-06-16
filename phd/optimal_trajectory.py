@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from trajectories import TrapezoidalTrajectory
 from airplane import Airplane
-from optimizer import optimize_trajectory
+
 
 if __name__=="__main__":
 
@@ -32,22 +33,21 @@ if __name__=="__main__":
 
     # Initialize airplane
     AMG12 = Airplane(airplane_info, propulsion_info)
+    
+    # Initialize trajectory
+    x = np.array([0.0,   124995.04597643, 199131.18607476, 283135.86116193, 314053.95364981, 2621668.0713922, 2893464.66708679, 3108188.29708082])
+    h = np.array([128.0, 18095.23998968,  27925.5154625,   37070.29581662,  35982.26830149,  37038.67142906,  18719.36226066,   4226.0])
+    N_steps = np.ones(len(x)-1, dtype=int)*int(1000/6)
+    trajectory = TrapezoidalTrajectory(AMG12, x, h, N_steps)
 
-    # Optimize
-    x0 = 0.0
-    x1 = 3108188.29708082
-    h0 = 128.0
-    h1 = 4226.0
-    x_guess = np.array([135152.44288833, 200000.0, 277379.85464449, 305276.27778943, 2632317.0942367, 2893667.53175198])
-    h_guess = np.array([18000.80444082,  28000.0,  36000.14418356,  35919.03050563,  36395.6015719,   18734.31352388])
-    opt_traj = optimize_trajectory(AMG12, x0, x1, h0, h1, x_guess, h_guess, N_steps_per_leg=50)
+    # Calculate
+    data = trajectory.calculate()
+    print("Total fuel burn: {0} lbf".format(data.W[0] - data.W[-1]))
 
-    # Get total flight time and fuel burn
-    t_flight = opt_traj.get_total_flight_time()
-    print()
+    # Get total flight time
+    t_flight = trajectory.get_total_flight_time()
     print("Total flight time: {0} hr".format(round(t_flight/3600, 5)))
-    print("Total fuel burn: {0} lbf".format(opt_traj.data.W[0] - opt_traj.data.W[-1]))
 
-    # Show optimal trajectory
-    opt_traj.write_data('optimal_trajectory.txt')
-    opt_traj.plot()
+    # Plot
+    trajectory.write_data("optimal_trajectory.txt")
+    trajectory.plot()

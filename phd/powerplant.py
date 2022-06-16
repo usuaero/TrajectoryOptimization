@@ -112,4 +112,5 @@ class Powerplant:
             Fuel consumption.
         """
 
-        return K*self.get_thrust_specific_fuel_consumption(h, V)*self.get_available_thrust(h, V)
+        fuel_burn = K*self.get_thrust_specific_fuel_consumption(h, V)*self.get_available_thrust(h, V)
+        return max(0.0, fuel_burn)

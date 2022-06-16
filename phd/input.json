@@ -1,0 +1,28 @@
+{
+	"settings": {
+		"trajectory_input_file": "optimal_trajectory.txt",
+		"discretization_steps" : 1000
+	},
+	"aircraft": {
+		"wing_area[ft^2]": 3600,
+		"wing_span[ft]": 180,
+		"final_weight[lbf]": 375000.0
+	},
+	"aerodynamics": {
+		"CD0": 0.0194,
+		"CD1": -0.0159,
+		"CD2": 0.09,
+		"CM1": 3.0,
+		"CM2": 30.0
+	},
+	"propulsion": {
+		"engine_count": 2,
+		"q": 0.6,
+		"CT[slug/lbf-s]": 6.0706e-6,
+		"N1": 0.9,
+		"T0[lbf]": 93000,
+		"m": 0.75,
+		"a1": -9.50e-4,
+		"a2": 5.00e-7
+	}
+}

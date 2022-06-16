@@ -227,7 +227,7 @@ class Airplane:
 
         # Optimize
         V_min = self.get_stall_speed(W, h, gamma)
-        V_max = 0.95*self._std_atmos.a(h) # No transonic here
+        V_max = 0.9*self._std_atmos.a(h) # No transonic here
         result = sopt.minimize_scalar(f, bounds=(V_min, V_max), method='bounded')
         return result.x
 
@@ -256,6 +256,71 @@ class Airplane:
         rho = self._std_atmos.rho(h)
 
         return np.sqrt(2.0*W*np.cos(gamma)/(rho*self._Sw*self._CL_max))
+
+
+    def get_max_speed(self, W, h, gamma):
+        """Calculates the max speed based on how much thrust the engines can provide.
+        
+        Parameters
+        ----------
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+
+        gamma : float
+            Climb angle.
+        
+        Returns
+        -------
+        float
+            Stall speed.
+        """
+
+        # Define root function
+        def f(V):
+            TA = self.engines.get_available_thrust(h, V)
+            D = self.get_drag(W, gamma, V, h)
+            return D - TA + W*np.sin(gamma)
+
+        # Find root
+        V_stall = self.get_stall_speed(W, h, gamma)
+        result = sopt.root_scalar(f, x0=V_stall*1.5, x1=V_stall*1.6)
+
+        return result.root
+
+
+    def get_min_speed(self, W, h, gamma):
+        """Calculates the min speed based on zero thrust.
+        
+        Parameters
+        ----------
+        W : float
+            Weight.
+
+        h : float
+            Altitude.
+
+        gamma : float
+            Climb angle.
+        
+        Returns
+        -------
+        float
+            Stall speed.
+        """
+
+        # Define root function
+        def f(V):
+            D = self.get_drag(W, gamma, V, h)
+            return D + W*np.sin(gamma)
+
+        # Find root
+        V_stall = self.get_stall_speed(W, h, gamma)
+        result = sopt.root_scalar(f, x0=V_stall*1.5, x1=V_stall*1.6)
+
+        return result.root
 
 
     def get_engine_performance(self, V, W, h, gamma):
@@ -296,7 +361,10 @@ class Airplane:
         # Get thrust-specific fuel consumption
         qT = self.engines.get_thrust_specific_fuel_consumption(h, V)
 
-        return K, TA, qT*K*TA
+        # Check for minimum fuel burn
+        fuel_burn = max(0.0, qT*K*TA)
+
+        return K, TA, fuel_burn
 
 
     def get_dynamics(self, V, W, h, gamma):

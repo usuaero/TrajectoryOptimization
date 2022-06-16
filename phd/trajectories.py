@@ -100,12 +100,12 @@ class TrapezoidalTrajectory:
         """
 
         # Allocate storage
-        data = TrajectoryParameters(self._N_total_steps)
+        self.data = TrajectoryParameters(self._N_total_steps)
 
         # Set final state (we'll be doing a backwards integration here)
-        data.x[-1] = self._x[-1]
-        data.h[-1] = self._h[-1]
-        data.W[-1] = self._airplane.get_min_weight()
+        self.data.x[-1] = self._x[-1]
+        self.data.h[-1] = self._h[-1]
+        self.data.W[-1] = self._airplane.get_min_weight()
 
         # Loop through legs of the trajectory
         j_end = self._N_total_steps - 1
@@ -113,14 +113,14 @@ class TrapezoidalTrajectory:
         for i in range(self._N_legs)[::-1]:
 
             # Integrate
-            y0 = np.array([self._gammas[i], data.h[j_end], data.W[j_end]])
+            y0 = np.array([self._gammas[i], self.data.h[j_end], self.data.W[j_end]])
             xi, yi = RK4(self._airplane.state_equation_wrt_x, y0, self._x[i+1], self._x[i], self._N_steps[i])
 
             # Parse out state variables
-            data.x[j_start:j_end+1] = xi[::-1]
-            data.gamma[j_start:j_end+1] = yi[::-1,0]
-            data.h[j_start:j_end+1] = yi[::-1,1]
-            data.W[j_start:j_end+1] = yi[::-1,2]
+            self.data.x[j_start:j_end+1] = xi[::-1]
+            self.data.gamma[j_start:j_end+1] = yi[::-1,0]
+            self.data.h[j_start:j_end+1] = yi[::-1,1]
+            self.data.W[j_start:j_end+1] = yi[::-1,2]
 
             # Set up for next iteration
             j_end = j_start
@@ -128,12 +128,97 @@ class TrapezoidalTrajectory:
 
         # Calculate other parameters
         for i in range(self._N_total_steps):
-            data.V[i] = self._airplane.get_max_range_airspeed(data.gamma[i], data.W[i], data.h[i])
-            data.CL[i] = self._airplane.get_CL(data.W[i], data.gamma[i], data.V[i], data.h[i])
-            data.K[i], data.TA[i], data.fuel_burn[i] = self._airplane.get_engine_performance(data.V[i], data.W[i], data.h[i], data.gamma[i])
-            data.V_stall[i] = self._airplane.get_stall_speed(data.W[i], data.h[i], data.gamma[i])
+            self.data.V[i] = self._airplane.get_max_range_airspeed(self.data.gamma[i], self.data.W[i], self.data.h[i])
+            self.data.CL[i] = self._airplane.get_CL(self.data.W[i], self.data.gamma[i], self.data.V[i], self.data.h[i])
+            self.data.K[i], self.data.TA[i], self.data.fuel_burn[i] = self._airplane.get_engine_performance(self.data.V[i], self.data.W[i], self.data.h[i], self.data.gamma[i])
+            self.data.V_stall[i] = self._airplane.get_stall_speed(self.data.W[i], self.data.h[i], self.data.gamma[i])
 
-        return data
+        return self.data
+
+
+    def write_data(self, filename):
+        """Writes the trajectory data to a txt file.
+        
+        Parameters
+        ----------
+        filename : str
+            File to write the data to.
+            
+        """
+
+        # Open file
+        with open(filename, 'w') as data_file:
+
+            # Write header
+            print("x[ft] Altitude[ft] Velocity[ft/s] gamma W V_stall CL K T_A fuel_burn", file=data_file)
+
+            for i in range(self._N_total_steps):
+                print("{0:>20.12f} {1:>20.12f} {2:>20.12f} {3:>20.12f} {4:>20.12f} {5:>20.12f} {6:>20.12f} {7:>20.12f} {8:>20.12f} {9:>20.12f}".format(self.data.x[i],
+                                                                                                                                                       self.data.h[i],
+                                                                                                                                                       self.data.V[i],
+                                                                                                                                                       self.data.gamma[i],
+                                                                                                                                                       self.data.W[i],
+                                                                                                                                                       self.data.V_stall[i],
+                                                                                                                                                       self.data.CL[i],
+                                                                                                                                                       self.data.K[i],
+                                                                                                                                                       self.data.TA[i],
+                                                                                                                                                       self.data.fuel_burn[i]), file=data_file)
+
+
+
+    def plot(self):
+        """Plots the data for this trajectory."""
+
+        # Plot
+        fig, ax = plt.subplots(nrows=2,ncols=3)
+
+        ax[0,0].plot(self.data.x, self.data.h, 'b-')
+        ax[0,0].set_xlabel('$x$ [ft]')
+        ax[0,0].set_ylabel('$h$ [ft]')
+        ax[0,0].set_title('Altitude')
+
+        ax[0,1].plot(self.data.x, self.data.V, 'b-', label='Actual')
+        ax[0,1].plot(self.data.x, self.data.V_stall, 'r--', label='Stall')
+        ax[0,1].plot(self.data.x, self.data.V_stall*1.1, 'y--', label='10% Margin')
+        ax[0,1].plot(self.data.x, self.data.V_stall*1.2, 'g--', label='20% Margin')
+        ax[0,1].set_xlabel('$x$ [ft]')
+        ax[0,1].set_ylabel('$V$ [ft/s]')
+        ax[0,1].set_title('Airspeed')
+        ax[0,1].legend()
+
+        ax[0,2].plot(self.data.x, self.data.W, 'b-')
+        ax[0,2].set_xlabel('$x$ [ft]')
+        ax[0,2].set_ylabel('$W$ [lbf]')
+        ax[0,2].set_title('Weight')
+
+        ax[1,0].plot(self.data.x, self.data.CL, 'b-')
+        ax[1,0].set_xlabel('$x$ [ft]')
+        ax[1,0].set_ylabel('$CL$')
+        ax[1,0].set_title('Lift Coefficient')
+
+        ax[1,1].plot(self.data.x, self.data.K, 'b-')
+        ax[1,1].set_xlabel('$x$ [ft]')
+        ax[1,1].set_ylabel('$\\kappa$')
+        ax[1,1].set_title('Throttle Setting')
+
+        ax[1,2].plot(self.data.x, self.data.TA, 'r--', label='Available')
+        ax[1,2].plot(self.data.x, self.data.TA*self.data.K, 'b-', label='Used')
+        ax[1,2].set_xlabel('$x$ [ft]')
+        ax[1,2].set_ylabel('$T$ [lbf]')
+        ax[1,2].set_title('Thrust')
+        ax[1,2].legend()
+
+        plt.show()
+
+
+    def get_total_flight_time(self):
+        """Gives the total flight time for the trajectory."""
+        return np.trapz(1.0/self.data.V, x=self.data.x)
+
+
+    def get_total_fuel_burn(self):
+        """Calculates the total fuel burn."""
+        return self.data.W[0] - self.data.W[-1]
 
 
 class TrajectoryParameters:
