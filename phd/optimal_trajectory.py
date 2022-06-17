@@ -34,11 +34,20 @@ if __name__=="__main__":
     # Initialize airplane
     AMG12 = Airplane(airplane_info, propulsion_info)
     
-    # Initialize trajectory
+    # Inputs
     x = np.array([0.0,   123051.00468246, 198463.35848024, 280666.54096332, 298424.79372597, 298642.49806828, 312794.39436446, 2627028.27011332, 2893802.4644102, 3108188.29708082])
     h = np.array([128.0, 17958.06269174,  27965.54308721,  38257.01437954,  37041.19613503,  37028.51073348,  36087.87455237,  36784.85023584,   18733.55060457,  4226.0])
-    N_steps = np.ones(len(x)-1, dtype=int)*int(1000/6)
+    N_total_steps = 10000
+    N_steps = np.ones(len(x)-1, dtype=int)*int(N_total_steps/(len(x)-1))
+    total_steps = np.sum(N_steps).item()
+    if total_steps != N_total_steps:
+        N_steps[0] += N_total_steps - total_steps
+    print()
+    print("Total steps used: {0}".format(np.sum(N_steps).item()))
+
+    # Initialize trajectory
     trajectory = TrapezoidalTrajectory(AMG12, x, h, N_steps)
+
     # Calculate
     data = trajectory.calculate()
     print("Total fuel burn: {0} lbf".format(data.W[0] - data.W[-1]))
